@@ -35,10 +35,21 @@ func (mycli *MyClient) eventHandler(evt interface{}) {
 	case *events.Message:
 		newMessage := v.Message
 		msg := newMessage.GetConversation()
-		fmt.Println("Message from:", v.Info.Sender.User, "->", msg)
+		
+		// Determine if the message is from a group or private chat
+		var chat types.JID
+		if v.Info.IsGroup {
+			chat = v.Info.Chat
+			fmt.Printf("Group message from %s in group %s: %s\n", v.Info.Sender.User, v.Info.Chat.User, msg)
+		} else {
+			chat = v.Info.Sender
+			fmt.Printf("Private message from %s: %s\n", v.Info.Sender.User, msg)
+		}
+
 		if msg == "" {
 			return
 		}
+
 		// Make a http request to localhost:5001/chat?q= with the message, and send the response
 		// URL encode the message
 		urlEncoded := url.QueryEscape(msg)
@@ -57,9 +68,11 @@ func (mycli *MyClient) eventHandler(evt interface{}) {
 		response := &waProto.Message{Conversation: proto.String(string(newMsg))}
 		fmt.Println("Response:", response)
 
-		userJid := types.NewJID(v.Info.Sender.User, types.DefaultUserServer)
-		mycli.WAClient.SendMessage(context.Background(), userJid, "", response)
-
+		// Send the message to the chat (group or private)
+		_, err = mycli.WAClient.SendMessage(context.Background(), chat, response)
+		if err != nil {
+			fmt.Println("Error sending message:", err)
+		}
 	}
 }
 

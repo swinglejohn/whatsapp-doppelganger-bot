@@ -3,7 +3,9 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -21,6 +23,27 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+type Config struct {
+	SenderNames map[string]string `json:"senderNames"`
+}
+
+var config Config
+
+func init() {
+	// Load configuration
+	configFile, err := ioutil.ReadFile("numbers-to-names.json")
+	if err != nil {
+		fmt.Println("Error reading config file:", err)
+		return
+	}
+
+	err = json.Unmarshal(configFile, &config)
+	if err != nil {
+		fmt.Println("Error parsing config file:", err)
+		return
+	}
+}
+
 type MyClient struct {
 	WAClient       *whatsmeow.Client
 	eventHandlerID uint32
@@ -34,26 +57,54 @@ func (mycli *MyClient) eventHandler(evt interface{}) {
 	switch v := evt.(type) {
 	case *events.Message:
 		newMessage := v.Message
-		msg := newMessage.GetConversation()
+		var msg string
+		
+		// Check if the message is a media message, extended text message, or regular conversation
+		if imageMsg := newMessage.GetImageMessage(); imageMsg != nil {
+			msg = "<Media omitted>"
+			msg += " " + imageMsg.GetCaption()
+		} else if videoMsg := newMessage.GetVideoMessage(); videoMsg != nil {
+			msg = "<Media omitted>"
+			msg += " " + videoMsg.GetCaption()
+		} else if audioMsg := newMessage.GetAudioMessage(); audioMsg != nil {
+			msg = "<Media omitted>"
+			// audio doesn't have captions apparently
+		} else if docMsg := newMessage.GetDocumentMessage(); docMsg != nil {
+			msg = "<Media omitted>"
+			msg += " " + docMsg.GetCaption()
+		} else if extendedMsg := newMessage.GetExtendedTextMessage(); extendedMsg != nil {
+			msg = extendedMsg.GetText()
+		} else {
+			msg = newMessage.GetConversation()
+		}
 		
 		// Determine if the message is from a group or private chat
 		var chat types.JID
+		var senderName string
 		if v.Info.IsGroup {
 			chat = v.Info.Chat
-			fmt.Printf("Group message from %s in group %s: %s\n", v.Info.Sender.User, v.Info.Chat.User, msg)
+			senderName = getSenderName(v.Info.Sender.User)
+			fmt.Printf("Group message from %s in group %s: %s\n", senderName, v.Info.Chat.User, msg)
+			// Remove the debug print statement
+			// fmt.Println("checking if newMessage is a response message:", newMessage)
 		} else {
 			chat = v.Info.Sender
-			fmt.Printf("Private message from %s: %s\n", v.Info.Sender.User, msg)
+			senderName = getSenderName(v.Info.Sender.User)
+			fmt.Printf("Private message from %s:  %s\n", senderName, msg)
 		}
 
 		if msg == "" {
 			return
 		}
 
-		// Make a http request to localhost:5001/chat?q= with the message, and send the response
-		// URL encode the message
-		urlEncoded := url.QueryEscape(msg)
-		url := "http://localhost:5001/chat?q=" + urlEncoded
+		// Format the message
+		formattedMsg := fmt.Sprintf("%s: %s", senderName, msg)
+
+		// URL encode the formatted message and chat ID
+		urlEncoded := url.QueryEscape(formattedMsg)
+		chatIDEncoded := url.QueryEscape(chat.String())
+		url := fmt.Sprintf("http://localhost:5001/chat?q=%s&chat_id=%s", urlEncoded, chatIDEncoded)
+
 		// Make the request
 		resp, err := http.Get(url)
 		if err != nil {
@@ -64,6 +115,13 @@ func (mycli *MyClient) eventHandler(evt interface{}) {
 		buf := new(bytes.Buffer)
 		buf.ReadFrom(resp.Body)
 		newMsg := buf.String()
+
+		// Check if the response is "No Message"
+		if newMsg == "No Message" {
+			fmt.Println("Response: No Message")
+			return
+		}
+
 		// encode out as a string
 		response := &waProto.Message{Conversation: proto.String(string(newMsg))}
 		fmt.Println("Response:", response)
@@ -74,6 +132,13 @@ func (mycli *MyClient) eventHandler(evt interface{}) {
 			fmt.Println("Error sending message:", err)
 		}
 	}
+}
+
+func getSenderName(phoneNumber string) string {
+	if name, ok := config.SenderNames[phoneNumber]; ok {
+		return name
+	}
+	return phoneNumber // Return the phone number if no name is found
 }
 
 func main() {

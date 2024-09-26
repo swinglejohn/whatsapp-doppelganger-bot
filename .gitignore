@@ -1,3 +1,5 @@
 venv
 .env
 examplestore.db
+numbers-to-names.json
+chat_histories.pkl

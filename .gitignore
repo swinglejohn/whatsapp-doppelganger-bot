@@ -3,3 +3,4 @@ venv
 examplestore.db
 numbers-to-names.json
 chat_histories.pkl
+disabled_chats.txt

@@ -81,15 +81,11 @@ func (mycli *MyClient) eventHandler(evt interface{}) {
 		// Determine if the message is from a group or private chat
 		var chat types.JID
 		var senderName string
+		chat = v.Info.Chat
+		senderName = getSenderName(v.Info.Sender.User)
 		if v.Info.IsGroup {
-			chat = v.Info.Chat
-			senderName = getSenderName(v.Info.Sender.User)
 			fmt.Printf("Group message from %s in group %s: %s\n", senderName, v.Info.Chat.User, msg)
-			// Remove the debug print statement
-			// fmt.Println("checking if newMessage is a response message:", newMessage)
 		} else {
-			chat = v.Info.Sender
-			senderName = getSenderName(v.Info.Sender.User)
 			fmt.Printf("Private message from %s:  %s\n", senderName, msg)
 		}
 

@@ -17,7 +17,8 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 # Load the custom fine-tuned model name from .env
 MODEL1 = os.getenv("OPENAI_MODEL_NAME1")
 MODEL2 = os.getenv("OPENAI_MODEL_NAME2")
-models = [MODEL1, MODEL2]
+MODEL3 = os.getenv("OPENAI_MODEL_NAME3")
+models = [MODEL1, MODEL2, MODEL3]
 
 # Message history for each chat
 CHAT_HISTORIES = {}
@@ -34,9 +35,8 @@ if os.path.exists(CHAT_HISTORIES_FILE):
 # Minimum number of messages required for context
 MIN_CONTEXT_MESSAGES = 20
 MAX_CONTEXT_MESSAGES = 20
-MESSAGES_TO_PREDICT = 3
-MESSAGE_RATE = 15
-MESSAGE_COOLDOWN = 0
+MESSAGES_TO_PREDICT = 2
+MESSAGE_RATE = 1000
 
 # Load disabled chat IDs
 DISABLED_CHATS_FILE = "disabled_chats.txt"
@@ -65,12 +65,12 @@ def chat():
     if chat_id not in CHAT_HISTORIES:
         CHAT_HISTORIES[chat_id] = []
     if chat_id not in CHAT_COOLDOWNS:
-        CHAT_COOLDOWNS[chat_id] = 0
+        CHAT_COOLDOWNS[chat_id] = MESSAGE_RATE
 
     # Special trigger messages override the cooldown and context so the model will always respond
     wasTriggered = False
     model, max_context_messages, messages_to_predict = (
-        MODEL2,
+        MODEL3,
         MAX_CONTEXT_MESSAGES,
         MESSAGES_TO_PREDICT,
     )
@@ -102,7 +102,7 @@ def chat():
     # Check if there are enough messages in the history
     if len(CHAT_HISTORIES[chat_id]) < MIN_CONTEXT_MESSAGES and not wasTriggered:
         print(
-            f"Not sending any message because there's only {len(CHAT_HISTORIES[chat_id])}/{MIN_CONTEXT_MESSAGES}"
+            f"Not sending any message because there's only {len(CHAT_HISTORIES[chat_id])}/{MIN_CONTEXT_MESSAGES} context messages"
         )
         return "No Message"
 
@@ -137,7 +137,7 @@ def chat():
     output_messages = []
     current_message = ""
     for line in gpt_response.split('\n'):
-        if ':' in line.split()[0]:
+        if line and ':' in line.split()[0]:
             if current_message:
                 output_messages.append(current_message.strip())
             current_message = line
@@ -158,8 +158,10 @@ def chat():
     print("RESPONSE:\n", gpt_response)
     print()
 
-    formatted_response = "\n".join(output_messages)
-    return formatted_response
+    # Get the model number based on the selected model
+    model_number = models.index(model) + 1 if model in models else 0
+
+    return f"*From FamBot* model: {model_number}, # context: {max_context_messages}, # msgs: {messages_to_predict}\n{gpt_response}"
 
 
 def start():

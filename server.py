@@ -3,6 +3,7 @@ import os
 import pickle
 
 import flask
+import tiktoken
 from dotenv import load_dotenv
 from openai import OpenAI
 
@@ -42,13 +43,27 @@ MESSAGE_RATE = 1000
 DISABLED_CHATS_FILE = "disabled_chats.txt"
 DISABLED_CHATS = set()
 
+
 def load_disabled_chats():
     global DISABLED_CHATS
     if os.path.exists(DISABLED_CHATS_FILE):
         with open(DISABLED_CHATS_FILE, "r") as f:
             DISABLED_CHATS = set(line.strip() for line in f)
 
+
 load_disabled_chats()
+
+# leading spaces  make these distinct tokens
+BANNED_TOKENS = ["http", " http", "https", " https"]
+LOGIT_BIAS = -100  # A large negative value to effectively ban the token
+
+
+# Add this function to convert tokens to token IDs
+def get_token_ids(tokens):
+    # obviously change this if you don't use a 4o based model
+    encoding = tiktoken.get_encoding("o200k_base")
+    return [encoding.encode(token)[0] for token in tokens]
+
 
 @APP.route("/chat", methods=["GET"])
 def chat():
@@ -122,7 +137,10 @@ def chat():
             [msg for msg in CHAT_HISTORIES[chat_id][-max_context_messages:]]
         )
 
-    # Call OpenAI API
+    # Prepare logit bias
+    token_ids = get_token_ids(BANNED_TOKENS)
+    logit_bias = {token_id: LOGIT_BIAS for token_id in token_ids}
+
     response = client.chat.completions.create(
         model=model,
         messages=[
@@ -130,19 +148,20 @@ def chat():
             {"role": "system", "content": f"predict {messages_to_predict} messages"},
             {"role": "user", "content": context},
         ],
+        logit_bias=logit_bias,
     )
 
     # Extract and process the response
     gpt_response = response.choices[0].message.content.strip()
     output_messages = []
     current_message = ""
-    for line in gpt_response.split('\n'):
-        if line and ':' in line.split()[0]:
+    for line in gpt_response.split("\n"):
+        if line.split() and ":" in line.split()[0]:
             if current_message:
                 output_messages.append(current_message.strip())
             current_message = line
         else:
-            current_message += '\n' + line if current_message else line
+            current_message += "\n" + line if current_message else line
     if current_message:
         output_messages.append(current_message.strip())
 

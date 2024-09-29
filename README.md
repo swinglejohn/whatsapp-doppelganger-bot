@@ -5,6 +5,8 @@ I forked this repo from Daniel Gross but it's doing something wildly different n
 The purpose of this repo is to send messages in a WhatsApp group chat using an LLM fine-tuned (separate repo) on that chat.
 
 ## Initial setup
+You can do pip install -r requirements.txt to install the python libraries 
+
 Use this command to copy the template files:
 `cp .template-env .env && cp .template-numbers-to-names.json numbers-to-names.json`
 Open .env and fill in your API key and model names

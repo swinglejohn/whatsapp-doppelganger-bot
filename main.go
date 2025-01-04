@@ -134,6 +134,8 @@ func getSenderName(phoneNumber string) string {
 	if name, ok := config.SenderNames[phoneNumber]; ok {
 		return name
 	}
+
+	fmt.Println("No name found for phone number:", phoneNumber)
 	return phoneNumber // Return the phone number if no name is found
 }
 

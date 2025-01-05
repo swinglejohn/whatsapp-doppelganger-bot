@@ -12,6 +12,28 @@ Use this command to copy the template files:
 Open .env and fill in your API key and model names
 Open numbers-to-names.json and add the names and numbers of everyone in the group chat
 
+## Compiling
+If you have a machine with > 1 GB of ram, you can just run the go code with `go run main.go`.
+
+If, for cost reasons, you're running this on a t4g.nano, you will want to compile the code on your personal machine and then copy the binary to the t4g.nano. A t4g.nano has 0.5 GB of ram and is an ARM64 machine.
+
+To compile the code you can run:
+```
+# 1. Install the ARM64 cross-compiler toolchain
+sudo apt update
+sudo apt install gcc-aarch64-linux-gnu
+
+# 2. Install SQLite dev packages
+sudo apt install libsqlite3-dev
+
+# 3. Cross-compile with the correct environment variables
+CGO_ENABLED=1 \
+GOOS=linux \
+GOARCH=arm64 \
+CC=aarch64-linux-gnu-gcc \
+go build main.go
+```
+
 ## Running it
 * You'll need to run WhatsApp from a phone number using the golang library I'm using. I just used my own WhatsApp account.
 * Two terminals: `go run main.go`, and `python server.py`. I am extremely doubtful they will work for you on the first run. Ask chatGPT.

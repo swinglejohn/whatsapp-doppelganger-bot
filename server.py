@@ -65,6 +65,34 @@ def get_token_ids(tokens):
     return [encoding.encode(token)[0] for token in tokens]
 
 
+def help_text():
+    return (
+        "*FamBot help*\n\n"
+        "Start your message with fambot or @fambot (case-insensitive).\n"
+        "fambot - reply now using the defaults.\n"
+        "fambot <model> <context> <messages> - reply with these settings.\n"
+        "Supply all three numbers, separated by spaces.\n\n"
+        "model: 1, 2, or 3 selects a different fine-tuned version.\n"
+        "context: number of recent stored chat messages to use; 0 uses none. "
+        "If fewer are available, FamBot uses what it has.\n"
+        "messages: how many chat messages to ask the model to predict. "
+        "The actual number may vary.\n\n"
+        f"Defaults: model 3, {MAX_CONTEXT_MESSAGES} context messages, "
+        f"{MESSAGES_TO_PREDICT} predicted messages.\n"
+        "Example: fambot 2 40 3 uses model 2, up to 40 recent messages, "
+        "and asks for 3 predictions.\n"
+        "Example: @fambot 3 0 2 asks for 2 predictions with no chat context.\n\n"
+        "Settings apply only to that request. Commands are not included "
+        "in the model's chat context. Explicit triggers work even with "
+        "little history and bypass the automatic reply cooldown.\n"
+        f"Automatic replies need at least {MIN_CONTEXT_MESSAGES} stored "
+        f"messages and a cooldown of {MESSAGE_RATE} eligible incoming messages.\n"
+        "Disabled chats stay silent, including for help.\n\n"
+        "Help: fambot help, fambot --help, or fambot -h "
+        "(also with @fambot). Help does not call the AI or change the cooldown."
+    )
+
+
 @APP.route("/chat", methods=["GET"])
 def chat():
     message = flask.request.args.get("q")
@@ -75,6 +103,13 @@ def chat():
     if chat_id in DISABLED_CHATS:
         print(f"Chat {chat_id} is disabled. Not sending any message.")
         return "No Message"
+
+    # Go prefixes the text with "Sender Name: "; names may contain spaces.
+    _, separator, message_body = message.partition(": ")
+    words = (message_body if separator else message).split()
+    is_trigger = bool(words) and words[0].lower() in ("@fambot", "fambot")
+    if is_trigger and len(words) > 1 and words[1].lower() in ("help", "--help", "-h"):
+        return help_text()
 
     # Initialize chat history and cooldown if they don't exist
     if chat_id not in CHAT_HISTORIES:
@@ -89,12 +124,11 @@ def chat():
         MAX_CONTEXT_MESSAGES,
         MESSAGES_TO_PREDICT,
     )
-    words = message.split()
-    if len(words) > 1 and words[1].lower() in ("@fambot", "fambot"):
+    if is_trigger:
         print()
         print("Trigger message detected")
         wasTriggered = True
-        params = words[2:5]
+        params = words[1:4]
         if len(params) == 3:
             try:
                 p1, p2, p3 = params

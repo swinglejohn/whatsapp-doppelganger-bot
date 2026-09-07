@@ -38,3 +38,24 @@ go build main.go
 * You'll need to run WhatsApp from a phone number using the golang library I'm using. I just used my own WhatsApp account.
 * Two terminals: `go run main.go`, and `python server.py`. I am extremely doubtful they will work for you on the first run. Ask chatGPT.
 * This marks the end of the readme file; it is a bit sparse; thankfully the code is too! Just tuck in if you can... and I will try to add more here later.
+
+## Chat commands
+
+Start a text message with `fambot` or `@fambot` (case-insensitive).
+
+- `fambot`: generate with defaults: model 3, up to 20 recent stored messages,
+  and 2 predicted messages.
+- `fambot <model> <context> <messages>`: override all three settings for this
+  request. Model is 1, 2, or 3; context is how many recent stored messages to
+  use (0 means none); messages is the requested number of predictions.
+  For example, `fambot 2 40 3` uses model 2 with up to 40 messages of context
+  and asks for 3 predictions. The actual number of predictions may vary.
+- `fambot help`, `fambot --help`, or `fambot -h`: show usage, examples, and
+  reply behavior. These also work with `@fambot`.
+
+Help is a fixed response: no model call, no cooldown change, and no command
+text added to chat history. Disabled chats stay silent. Explicit generation
+triggers bypass the minimum history and cooldown; automatic generation needs
+at least 20 stored messages and a cooldown of 1000 eligible incoming messages.
+
+Run the isolated tests with `python -m unittest discover -s tests`.
